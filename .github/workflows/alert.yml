@@ -23,4 +23,6 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
-        run: python send_mail_test.py
+      - name: Install dependencies
+        run: pip install yfinance
+        run:python alert_bot.py
