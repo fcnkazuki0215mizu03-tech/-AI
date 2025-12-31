@@ -1,121 +1,99 @@
 import os
+import yfinance as yf
+import pandas as pd
+from datetime import datetime
+
+# --- Gmail送信（前に成功した送信処理） ---
 import smtplib
 from email.mime.text import MIMEText
-from datetime import datetime, timezone
-
-import yfinance as yf
-
-# ---- mail ----
-GMAIL_USER = os.environ["GMAIL_USER"]
-GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
-TO = os.environ.get("MAIL_TO", GMAIL_USER)
 
 def send_mail(subject: str, body: str) -> None:
+    user = os.environ["GMAIL_USER"]
+    app_pw = os.environ["GMAIL_APP_PASSWORD"]
+    to = os.environ.get("MAIL_TO", user)
+
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
-    msg["From"] = GMAIL_USER
-    msg["To"] = TO
-    with smtplib.SMTP("smtp.gmail.com", 587) as s:
-        s.ehlo()
-        s.starttls()
-        s.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+    msg["From"] = user
+    msg["To"] = to
+
+    # 465(SSL)で送る版（あなたの環境で成功しているならこれでOK）
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
+        s.login(user, app_pw)
         s.send_message(msg)
 
-# ---- signal utils ----
-def rsi(series, period: int = 14):
-    delta = series.diff()
-    up = delta.clip(lower=0).rolling(period).mean()
-    down = (-delta.clip(upper=0)).rolling(period).mean()
-    rs = up / down
+# --- 指標計算 ---
+def calc_rsi(close: pd.Series, period: int = 14) -> pd.Series:
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = (-delta).clip(lower=0)
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
+    rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
-def fetch_close(ticker: str, days: int = 120):
+def fetch_close(ticker: str, days: int = 120) -> pd.Series:
     df = yf.download(ticker, period=f"{days}d", interval="1d", auto_adjust=True, progress=False)
     if df is None or df.empty:
-        raise RuntimeError(f"no data: {ticker}")
+        raise RuntimeError(f"No price data: {ticker}")
     return df["Close"]
 
-def tech_signal(close):
-    ma20 = close.rolling(20).mean().iloc[-1]
-    ma50 = close.rolling(50).mean().iloc[-1]
-    last = close.iloc[-1]
-    r = rsi(close).iloc[-1]
+def judge_signal(ticker: str) -> dict:
+    close = fetch_close(ticker, 120)
+    last = float(close.iloc[-1])
 
-    # ざっくり初期ルール（あとで調整）
-    if r >= 70 and last < ma20:
-        return "SELL_CANDIDATE", r, last, ma20, ma50
-    if r <= 30 and last > ma20:
-        return "BUY_CANDIDATE", r, last, ma20, ma50
-    if last > ma20 > ma50:
-        return "UP_TREND", r, last, ma20, ma50
-    if last < ma20 < ma50:
-        return "DOWN_TREND", r, last, ma20, ma50
-    return "HOLD", r, last, ma20, ma50
+    ma20 = float(close.rolling(20).mean().iloc[-1])
+    rsi14 = float(calc_rsi(close, 14).iloc[-1])
 
-def market_risk():
-    # 地合い指標（超シンプル版）
-    # NASDAQ: ^IXIC / S&P: ^GSPC / VIX: ^VIX / USDJPY: JPY=X / 米10年金利: ^TNX
-    ixic = fetch_close("^IXIC", 120)
-    vix = fetch_close("^VIX", 120)
-    tnx = fetch_close("^TNX", 120)
+    # --- ここが「利益確定優先」の判定 ---
+    # SELL強：過熱（RSI>=70）＋失速（終値がMA20割れ）
+    if rsi14 >= 70 and last < ma20:
+        level = "SELL_STRONG"
+        action = "利益確定優先（部分利確30〜50%目安）"
+    # BUY強：売られすぎ（RSI<=30）＋反転確認（終値がMA20超え）
+    elif rsi14 <= 30 and last > ma20:
+        level = "BUY_STRONG"
+        action = "買い増し候補（分割で）"
+    else:
+        level = "HOLD"
+        action = "様子見"
 
-    ixic_ma20 = ixic.rolling(20).mean().iloc[-1]
-    ixic_last = ixic.iloc[-1]
-    vix_last = vix.iloc[-1]
-    tnx_last = tnx.iloc[-1]
-
-    risk = 0
-    if ixic_last < ixic_ma20:  # ナスが20MA下
-        risk += 1
-    if vix_last >= 20:        # VIX高め
-        risk += 1
-    if tnx_last >= 45:        # 10年金利(=^TNX)が高め（目安）
-        risk += 1
-
-    return risk, ixic_last, vix_last, tnx_last
+    reason = f"Close={last:.2f}, MA20={ma20:.2f}, RSI14={rsi14:.1f}"
+    return {"ticker": ticker, "level": level, "action": action, "reason": reason}
 
 def main():
-    # 保有銘柄（必要なら後で変更）
+    # 監視銘柄（必要なら増やしてOK）
     tickers = {
         "SoftBank(9984.T)": "9984.T",
+        "Advantest(6857.T)": "6857.T",
+        "Yaskawa(6506.T)": "6506.T",
+        "Fujitsu(6702.T)": "6702.T",
         "Tesla(TSLA)": "TSLA",
         "NVIDIA(NVDA)": "NVDA",
         "Supermicro(SMCI)": "SMCI",
         "Amazon(AMZN)": "AMZN",
         "Microsoft(MSFT)": "MSFT",
-        "Advantest(6857.T)": "6857.T",
+        "Palantir(PLTR)": "PLTR",
+        "Marvell(MRVL)": "MRVL",
         "BYD(1211.HK)": "1211.HK",
     }
 
-    risk, ixic_last, vix_last, tnx_last = market_risk()
-
-    lines = []
+    results = []
     alerts = []
+
     for name, t in tickers.items():
-        close = fetch_close(t, 120)
-        sig, r, last, ma20, ma50 = tech_signal(close)
+        r = judge_signal(t)
+        results.append(f"{name}: {r['level']} | {r['action']} | {r['reason']}")
+        if r["level"] in ("SELL_STRONG", "BUY_STRONG"):
+            alerts.append(f"{name}: {r['level']} | {r['action']} | {r['reason']}")
 
-        line = f"{name}: {sig} | RSI {r:.1f} | Close {last:.2f} | MA20 {ma20:.2f} | MA50 {ma50:.2f}"
-        lines.append(line)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    body = "\n".join([f"Time: {now}", "", "--- Alerts ---"] + (alerts if alerts else ["（該当なし）"]) + ["", "--- All ---"] + results)
 
-        # アラート条件（初期：売り/買い候補だけ通知）
-        if sig in ("SELL_CANDIDATE", "BUY_CANDIDATE"):
-            alerts.append(line)
-
-    now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
-    header = [
-        f"Time: {now}",
-        f"Market risk score: {risk} (NASDAQ {ixic_last:.0f}, VIX {vix_last:.1f}, US10Y(^TNX) {tnx_last:.1f})",
-        "",
-    ]
-
+    # アラートがある時だけメール（スパム防止の第一歩）
     if alerts:
-        subject = f"【株アラート】売買候補 {len(alerts)}件 / risk={risk}"
-        body = "\n".join(header + ["--- Alerts ---"] + alerts + ["", "--- All ---"] + lines)
+        subject = f"【株アラート】{len(alerts)}件（BUY/SELL強）"
         send_mail(subject, body)
-    else:
-        # 無駄通知を減らすため、通常は送らない（欲しければここを送るに変更OK）
-        pass
 
 if __name__ == "__main__":
     main()
