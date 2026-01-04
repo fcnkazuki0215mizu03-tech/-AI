@@ -139,7 +139,6 @@ if __name__ == "__main__":
     main()
 if not alerts:
     send_mail("stock-alert-mailer (heartbeat)", "今回は通知条件なし（動作確認用）")
-    return
 def main():
     tickers = os.environ.get("TICKERS", "PLTR MRVL 6506.T 6702.T").split()
 
