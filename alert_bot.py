@@ -135,10 +135,34 @@ def main():
     # アラートがあるときだけ送る（必要ならここを変える）
     if alerts:
         send_mail(f"【株アラート】{len(alerts)}件", body)
-
-
 if __name__ == "__main__":
     main()
 if not alerts:
     send_mail("stock-alert-mailer (heartbeat)", "今回は通知条件なし（動作確認用）")
     return
+def main():
+    tickers = os.environ.get("TICKERS", "PLTR MRVL 6506.T 6702.T").split()
+
+    results = []
+    for t in tickers:
+        try:
+            r = judge_signal(t)
+            results.append(r)
+        except Exception as e:
+            results.append({"ticker": t, "level": "ERROR", "action": "例外", "reason": str(e)})
+
+    lines = []
+    for r in results:
+        lines.append(
+            f"{r.get('ticker')} | {r.get('level')} | {r.get('action')} | {r.get('reason','')}"
+        )
+
+    subject = f"stock-alert TEST {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    body = "(TEST) 強制送信\n\n" + "\n".join(lines)
+
+    # ★ここがポイント：強制的に送る
+    send_mail(subject, body)
+
+
+if __name__ == "__main__":
+    main()
