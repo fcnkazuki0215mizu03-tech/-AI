@@ -6,7 +6,24 @@ import yfinance as yf
 
 import smtplib
 from email.mime.text import MIMEText
+# --- 通知テンプレ（A/B/C） ---
+PROMPT_A = """[A: 買い] 結論: {size}
+理由: {reason}
+参考: RSI14={rsi14:.1f}, MA20={ma20:.2f}, Close={last:.2f}
+アクション: 指値/成行の目安や分割案を提示して
+"""
 
+PROMPT_B = """[B: 買い増し/様子見] 結論: {size}
+理由: {reason}
+参考: RSI14={rsi14:.1f}, MA20={ma20:.2f}, Close={last:.2f}
+アクション: 買い増しなら分割、様子見なら条件を提示して
+"""
+
+PROMPT_C = """[C: 利益確定優先] 結論: {size}
+理由: {reason}
+参考: RSI14={rsi14:.1f}, MA20={ma20:.2f}, Close={last:.2f}
+アクション: 一部利確/全利確の割合案を提示して
+"""
 
 # --- Gmail送信（前に成功した送信処理） ---
 def send_mail(subject: str, body: str) -> None:
