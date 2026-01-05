@@ -93,7 +93,9 @@ def main() -> None:
         subject = f"stock-alert-mailer {'ALERT' if alerts else 'TEST'} {now}"
         send_mail(subject, body)
 
-
 if __name__ == "__main__":
-    main()
-    send_mail("stock-alert-mailer ✅ TEST", "This is a success-path test mail.")
+    # テストメールだけ送信したいとき
+    if os.environ.get("SUCCESS_TEST", "0") == "1":
+        send_mail("stock-alert-mailer ✅ TEST", "This is a success-path test mail.")
+    else:
+        main()
