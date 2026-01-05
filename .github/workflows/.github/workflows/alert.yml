@@ -3,8 +3,10 @@ name: stock-alert-mailer
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
-    
+    # 例：平日 07:10 / 月〜木 23:30（必要なら変えてOK）
+    - cron: "10 22 * * 1-5"  # GitHubはUTCなので +9h で日本時間 07:10
+    - cron: "30 14 * * 0-4"  # +9h で日本時間 23:30
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -16,11 +18,16 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install yfinance pandas
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas
 
       - name: Run alert bot
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          TICKERS: "PLTR"        # まずはこれでOK（複数なら "PLTR,AAPL,TSLA"）
+          ALWAYS_SEND: "1"       # アラート無くても必ず送る（本番運用では "0" に戻す）
+          SUCCESS_TEST: "0"      # テストメールだけ出したい時は "1"
         run: python alert_bot.py
