@@ -96,3 +96,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    send_mail("stock-alert-mailer ✅ TEST", "This is a success-path test mail.")
