@@ -1,4 +1,6 @@
 import os
+VERSION = "v2026-01-12-01"
+print("RUNNING VERSION:", VERSION)
 from datetime import datetime
 
 import pandas as pd
@@ -136,7 +138,7 @@ def main() -> None:
     always_send = os.environ.get("ALWAYS_SEND", "0") == "1"
 
     if alerts or always_send:
-        subject = f"stock-alert-mailer {'ALERT' if alerts else 'TEST'} {now}"
+        subject = f"stock-alert-mailer {VERSION} {'ALERT' if alerts else 'TEST'} {now}"
         send_mail(subject, body)
 
 
