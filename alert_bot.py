@@ -99,3 +99,4 @@ if __name__ == "__main__":
         send_mail("stock-alert-mailer ✅ TEST", "This is a success-path test mail.")
     else:
         main()
+
