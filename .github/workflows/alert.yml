@@ -3,36 +3,29 @@ name: stock-alert-mailer
 on:
   workflow_dispatch:
   schedule:
-    # 例：平日 朝7:10と夜23:30に実行（UTCなので+9h）
-    - cron: "10 22 * * 1-5"  # 日本時間 07:10
-    - cron: "30 14 * * 0-4"  # 日本時間 23:30
+    - cron: "10 22 * * 1-5"   # 平日07:10 JST
+    - cron: "30 14 * * 0-4"   # 平日23:30 JST
 
 jobs:
   run:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install yfinance pandas
+        run: pip install yfinance pandas
 
       - name: Run alert bot
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
-          SUCCESS_TEST: "1"
-
-          # ======== 以下の3行を重要設定 =========
-          TICKERS: "PLTR,AAPL,MSFT"   # 対象銘柄をカンマ区切りで
-          ALWAYS_SEND: "1"             # アラートがなくても常に送信（テスト確認用）
-          # ====================================
-
+          TICKERS: "AAPL,MSFT,PLTR"
+          ALWAYS_SEND: "1"
+          SUCCESS_TEST: "0"
         run: python alert_bot.py
