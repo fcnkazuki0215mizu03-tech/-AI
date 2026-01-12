@@ -40,74 +40,49 @@ def fetch_close(ticker: str, days: int = 120) -> pd.Series:
         raise RuntimeError(f"No price data for {ticker}")
     return df["Close"]
 
-def judge_signal(ticker: str) -> dict:
-    close = fetch_close(ticker, 120)
+else:
+    level = "HOLD"
+    action = "様子見"
 
-    last = float(close.iloc[-1])
-    ma20 = float(close.rolling(20).mean().iloc[-1])
-    rsi14 = float(calc_rsi(close, 14))
-
-    # 判定条件（必要ならここだけ数値を変えればOK）
-    SELL_RSI = 70
-    BUY_RSI  = 30
-
-    # どれだけ条件から離れているか（HOLD理由で使う）
-    rsi_to_sell = SELL_RSI - rsi14   # <=0 なら売りRSI条件達成
-    rsi_to_buy  = rsi14 - BUY_RSI    # <=0 なら買いRSI条件達成
-    pct_vs_ma20 = (last / ma20 - 1.0) * 100.0 if ma20 != 0 else 0.0
-
-    # SELL_STRONG
-    if (rsi14 >= SELL_RSI) and (last < ma20):
-        level = "SELL_STRONG"
-        action = "利益確定優先（分割で）"
-        reason = (
-            f"RSI14={rsi14:.1f}が{SELL_RSI}以上（過熱気味）かつ、"
-            f"終値={last:.2f}がMA20={ma20:.2f}を下回り（MA20比{pct_vs_ma20:.2f}%）→ 売り条件一致"
-        )
-
-    # BUY_STRONG
-    elif (rsi14 <= BUY_RSI) and (last > ma20):
-        level = "BUY_STRONG"
-        action = "買い増し候補（分割で）"
-        reason = (
-            f"RSI14={rsi14:.1f}が{BUY_RSI}以下（売られ過ぎ）かつ、"
-            f"終値={last:.2f}がMA20={ma20:.2f}を上回り（MA20比{pct_vs_ma20:.2f}%）→ 買い条件一致"
-        )
-
-    # HOLD（ここが今回のポイント）
+    # ① 今の「方向感」を一言で
+    if abs(pct_vs_ma20) < 1.0:
+        trend_msg = "最近の値動きはほぼ横ばい（方向がはっきりしない）"
+    elif pct_vs_ma20 >= 1.0:
+        trend_msg = "最近は上向き気味（ただし勢いが続くかは様子見）"
     else:
-        level = "HOLD"
-        action = "様子見"
+        trend_msg = "最近は下向き気味（ただし下げ止まるかは様子見）"
 
-        hold_parts = []
-        # 売り側が成立しない理由
-        if rsi14 < SELL_RSI:
-            hold_parts.append(f"売り未達：RSIが{SELL_RSI}未満（あと{rsi_to_sell:.1f}）")
-        if last >= ma20:
-            hold_parts.append(f"売り未達：終値がMA20以上（MA20比{pct_vs_ma20:.2f}%）")
+    # ② 「買いサイン」「売りサイン」が揃ってない理由を平易に
+    reasons = []
 
-        # 買い側が成立しない理由
-        if rsi14 > BUY_RSI:
-            hold_parts.append(f"買い未達：RSIが{BUY_RSI}超（あと{rsi_to_buy:.1f}）")
-        if last <= ma20:
-            hold_parts.append(f"買い未達：終値がMA20以下（MA20比{pct_vs_ma20:.2f}%）")
+    # 売りの理由：過熱 + 崩れ
+    if rsi14 < SELL_RSI:
+        reasons.append("売り：まだ『買われ過ぎ』の水準ではない（高値圏の過熱サインが弱い）")
+    if last >= ma20:
+        reasons.append("売り：値段がまだ大きく崩れていない（下落に転じたとは言い切れない）")
 
-        # “次にどうなったら”も付ける
-        reason = (
-            f"RSI14={rsi14:.1f}, 終値={last:.2f}, MA20={ma20:.2f}（MA20比{pct_vs_ma20:.2f}%）\n"
-            f"理由：{' / '.join(hold_parts)}\n"
-            f"目安：SELLは RSI≥{SELL_RSI} かつ 終値<MA20、BUYは RSI≤{BUY_RSI} かつ 終値>MA20"
-        )
+    # 買いの理由：売られ過ぎ + 反発
+    if rsi14 > BUY_RSI:
+        reasons.append("買い：まだ『売られ過ぎ』の水準ではない（安値圏とは言い切れない）")
+    if last <= ma20:
+        reasons.append("買い：反発が弱い（上向きに戻ったとは言い切れない）")
 
-    return {
-        "ticker": ticker,
-        "level": level,
-        "action": action,
-        "reason": reason,
-        "close": last,
-        "ma20": ma20,
-        "rsi14": rsi14,
-    }
+    # ③ 次にどうなったら動くか（目安）
+    next_steps = (
+        f"目安：\n"
+        f"・買い増し候補 → 『安すぎサイン』が出たうえで、価格が上向きに戻る\n"
+        f"・利益確定候補 → 『過熱サイン』が出たうえで、価格が下向きに崩れる\n"
+        f"(参考値: RSIは買い={BUY_RSI}以下、売り={SELL_RSI}以上を目安)"
+    )
+
+    # ④ まとめ（数字は“参考”として最後に小さく）
+    reason = (
+        f"{trend_msg}\n"
+        f"今回は『買い』も『売り』も決め手が不足しているため様子見です。\n"
+        f"理由：\n- " + "\n- ".join(reasons) + "\n\n"
+        f"{next_steps}\n\n"
+        f"参考データ：終値={last:.2f}, MA20={ma20:.2f}（MA20比{pct_vs_ma20:.2f}%）, RSI14={rsi14:.1f}"
+    )
 
 
 def parse_tickers() -> list[str]:
