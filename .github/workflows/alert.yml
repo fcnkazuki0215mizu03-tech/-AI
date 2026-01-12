@@ -25,7 +25,9 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
-          TICKERS: "AAPL,MSFT,PLTR"
-          ALWAYS_SEND: "1"
-          SUCCESS_TEST: "0"
+  # ======== ここを重要設定 =========
+  TICKERS: "PLTR,AAPL,MSFT,TSLA,BYDDY,NVDA,AVGO"
+  ALWAYS_SEND: "1"          # テスト中だけ 1（本番は 0 推奨）
+  SUCCESS_TEST: "0"         # 0=株価判定メール / 1=成功テストメール
+  # =================================
         run: python alert_bot.py
