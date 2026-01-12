@@ -28,6 +28,7 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          SUCCESS_TEST: "1"
 
           # ======== 以下の3行を重要設定 =========
           TICKERS: "PLTR,AAPL,MSFT"   # 対象銘柄をカンマ区切りで
