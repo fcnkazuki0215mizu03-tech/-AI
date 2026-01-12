@@ -40,25 +40,74 @@ def fetch_close(ticker: str, days: int = 120) -> pd.Series:
         raise RuntimeError(f"No price data for {ticker}")
     return df["Close"]
 
-
 def judge_signal(ticker: str) -> dict:
     close = fetch_close(ticker, 120)
+
     last = float(close.iloc[-1])
     ma20 = float(close.rolling(20).mean().iloc[-1])
-    rsi14 = calc_rsi(close, 14)
+    rsi14 = float(calc_rsi(close, 14))
 
-    if rsi14 >= 70 and last < ma20:
+    # 判定条件（必要ならここだけ数値を変えればOK）
+    SELL_RSI = 70
+    BUY_RSI  = 30
+
+    # どれだけ条件から離れているか（HOLD理由で使う）
+    rsi_to_sell = SELL_RSI - rsi14   # <=0 なら売りRSI条件達成
+    rsi_to_buy  = rsi14 - BUY_RSI    # <=0 なら買いRSI条件達成
+    pct_vs_ma20 = (last / ma20 - 1.0) * 100.0 if ma20 != 0 else 0.0
+
+    # SELL_STRONG
+    if (rsi14 >= SELL_RSI) and (last < ma20):
         level = "SELL_STRONG"
         action = "利益確定優先（分割で）"
-    elif rsi14 <= 30 and last > ma20:
+        reason = (
+            f"RSI14={rsi14:.1f}が{SELL_RSI}以上（過熱気味）かつ、"
+            f"終値={last:.2f}がMA20={ma20:.2f}を下回り（MA20比{pct_vs_ma20:.2f}%）→ 売り条件一致"
+        )
+
+    # BUY_STRONG
+    elif (rsi14 <= BUY_RSI) and (last > ma20):
         level = "BUY_STRONG"
         action = "買い増し候補（分割で）"
+        reason = (
+            f"RSI14={rsi14:.1f}が{BUY_RSI}以下（売られ過ぎ）かつ、"
+            f"終値={last:.2f}がMA20={ma20:.2f}を上回り（MA20比{pct_vs_ma20:.2f}%）→ 買い条件一致"
+        )
+
+    # HOLD（ここが今回のポイント）
     else:
         level = "HOLD"
         action = "様子見"
 
-    reason = f"Close={last:.2f}, MA20={ma20:.2f}, RSI14={rsi14:.1f}"
-    return {"ticker": ticker, "level": level, "action": action, "reason": reason}
+        hold_parts = []
+        # 売り側が成立しない理由
+        if rsi14 < SELL_RSI:
+            hold_parts.append(f"売り未達：RSIが{SELL_RSI}未満（あと{rsi_to_sell:.1f}）")
+        if last >= ma20:
+            hold_parts.append(f"売り未達：終値がMA20以上（MA20比{pct_vs_ma20:.2f}%）")
+
+        # 買い側が成立しない理由
+        if rsi14 > BUY_RSI:
+            hold_parts.append(f"買い未達：RSIが{BUY_RSI}超（あと{rsi_to_buy:.1f}）")
+        if last <= ma20:
+            hold_parts.append(f"買い未達：終値がMA20以下（MA20比{pct_vs_ma20:.2f}%）")
+
+        # “次にどうなったら”も付ける
+        reason = (
+            f"RSI14={rsi14:.1f}, 終値={last:.2f}, MA20={ma20:.2f}（MA20比{pct_vs_ma20:.2f}%）\n"
+            f"理由：{' / '.join(hold_parts)}\n"
+            f"目安：SELLは RSI≥{SELL_RSI} かつ 終値<MA20、BUYは RSI≤{BUY_RSI} かつ 終値>MA20"
+        )
+
+    return {
+        "ticker": ticker,
+        "level": level,
+        "action": action,
+        "reason": reason,
+        "close": last,
+        "ma20": ma20,
+        "rsi14": rsi14,
+    }
 
 
 def parse_tickers() -> list[str]:
