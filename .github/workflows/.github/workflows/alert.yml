@@ -30,4 +30,3 @@ jobs:
           TICKERS: "PLTR"        # まずはこれでOK（複数なら "PLTR,AAPL,TSLA"）
           ALWAYS_SEND: "1"       # アラート無くても必ず送る（本番運用では "0" に戻す）
           SUCCESS_TEST: "0"      # テストメールだけ出したい時は "1"
-        run: python alert_bot.py
