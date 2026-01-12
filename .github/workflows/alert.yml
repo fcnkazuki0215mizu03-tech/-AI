@@ -33,7 +33,6 @@ jobs:
           # ======== 以下の3行を重要設定 =========
           TICKERS: "PLTR,AAPL,MSFT"   # 対象銘柄をカンマ区切りで
           ALWAYS_SEND: "1"             # アラートがなくても常に送信（テスト確認用）
-          SUCCESS_TEST: "0"            # テストメールモードOFFにする
           # ====================================
 
         run: python alert_bot.py
