@@ -83,6 +83,23 @@ def fetch_company_news(ticker: str) -> dict:
 
     return {"score": avg, "summary": summary, "headlines": top3}
 
+def judge_signal(ticker: str, news_info: dict | None = None) -> dict:
+    ...
+    # 既存の reason を作ったあとに
+    if news_info:
+        # 見出しは3件だけ表示（長くなりすぎないように）
+        heads = news_info.get("headlines", [])
+        heads_txt = "\n".join([f"  ・{h}" for h in heads]) if heads else "  ・（見出しなし）"
+        reason = (
+            reason
+            + "\n\n"
+            + news_info.get("summary", "個別ニュース: -")
+            + "\n主な見出し:\n"
+            + heads_txt
+        )
+
+    return {"ticker": ticker, "level": level, "action": action, "reason": reason}
+    
 # ========= メール送信設定 =========
 def send_mail(subject: str, body: str) -> None:
     user = os.environ["GMAIL_USER"]
