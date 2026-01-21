@@ -1,7 +1,8 @@
 import os
 VERSION = "v2026-01-12-01"
 print("RUNNING VERSION:", VERSION)
-from datetime import datetime
+import requests
+from datetime import timedelta
 
 import pandas as pd
 import yfinance as yf
