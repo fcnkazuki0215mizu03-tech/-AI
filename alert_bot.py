@@ -10,6 +10,78 @@ import yfinance as yf
 import smtplib
 from email.mime.text import MIMEText
 
+# ========= ニュース取得設定 =========
+def fetch_company_news(ticker: str) -> dict:
+    """
+    戻り値:
+      {
+        "score": -1.0〜+1.0 の目安（ネガ〜ポジ）,
+        "summary": "素人向けの一言",
+        "headlines": ["見出し1", "見出し2", ...]
+      }
+    """
+    if os.environ.get("USE_NEWS", "0") != "1":
+        return {"score": 0.0, "summary": "個別ニュース: OFF", "headlines": []}
+
+    api_key = os.environ.get("NEWS_API_KEY")
+    if not api_key:
+        return {"score": 0.0, "summary": "個別ニュース: APIキー未設定", "headlines": []}
+
+    lookback_h = int(os.environ.get("NEWS_LOOKBACK_HOURS", "72"))
+    limit = int(os.environ.get("NEWS_LIMIT", "20"))
+    time_from = (datetime.utcnow() - timedelta(hours=lookback_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # ここは使うニュースAPIに合わせてURL/paramsを調整する
+    # 例：queryに ticker を入れる / from を入れる / limit を入れる など
+    url = "https://example-news-api.com/query"
+    params = {
+        "q": ticker,
+        "from": time_from,
+        "limit": limit,
+        "apikey": api_key,
+        "lang": "en",  # 日本語も欲しければ "ja" or 両方
+    }
+
+    try:
+        r = requests.get(url, params=params, timeout=25)
+        data = r.json()
+    except Exception as e:
+        return {"score": 0.0, "summary": f"個別ニュース: 取得失敗（{e}）", "headlines": []}
+
+    # --- 返却データの取り出し（APIによりフィールド名は違う） ---
+    # 例：data["articles"] の中に title と sentiment がある想定
+    articles = data.get("articles", []) or []
+
+    headlines = []
+    scores = []
+    for a in articles[:limit]:
+        title = a.get("title") or ""
+        if title:
+            headlines.append(title.strip())
+
+        s = a.get("sentiment_score")  # APIによっては無い（その場合は後で別方法に）
+        if s is not None:
+            try:
+                scores.append(float(s))
+            except Exception:
+                pass
+
+    avg = sum(scores) / len(scores) if scores else 0.0
+
+    if avg <= -0.15:
+        mood = "逆風（悪材料多め）"
+        hint = "→ 買うなら少額・分割、深追い注意"
+    elif avg >= 0.15:
+        mood = "追い風（好材料多め）"
+        hint = "→ 攻めやすいが買い過ぎ注意"
+    else:
+        mood = "中立（強弱まちまち）"
+        hint = "→ テクニカル重視でOK"
+
+    summary = f"個別ニュース: {mood} / 平均={avg:+.2f} {hint}"
+    top3 = headlines[:3]
+
+    return {"score": avg, "summary": summary, "headlines": top3}
 
 # ========= メール送信設定 =========
 def send_mail(subject: str, body: str) -> None:
