@@ -237,8 +237,22 @@ def main() -> None:
 
 
 # ========= 実行部分 =========
+def debug_print_one(ticker: str) -> None:
+    r = judge_signal(ticker)
+    print("=== DEBUG RESULT ===")
+    for k, v in r.items():
+        print(f"{k}: {v}")
+
 if __name__ == "__main__":
-    if os.environ.get("SUCCESS_TEST", "0") == "1":
+    # デバッグ：Actionsログに出す（メール不要）
+    if os.environ.get("DEBUG_ONLY", "0") == "1":
+        t = os.environ.get("DEBUG_TICKER", "TSM")
+        debug_print_one(t)
+
+    # テストメール（SMTP成功だけ確認）
+    elif os.environ.get("SUCCESS_TEST", "0") == "1":
         send_mail("stock-alert-mailer ✅ TEST", "This is a success-path test mail.")
+
+    # 通常運転（株価判定→必要ならメール送信）
     else:
         main()
