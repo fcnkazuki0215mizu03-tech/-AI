@@ -26,20 +26,17 @@ jobs:
 
       - name: Run alert bot
         env:
+          PYTHONFAULTHANDLER: "1"
           # 既存（メール送信）
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
 
-          # 監視対象・挙動（ここを必要に応じて変える）
-          TICKERS: "PLTR,AAPL,MSFT,TSLA,BYDDY,1211.HK,NVDA"
-          ALWAYS_SEND: "1"      # テスト中は1（必ず送る）。本番は0推奨
-          SUCCESS_TEST: "0"     # 0=株価判定メール / 1=成功テストメールのみ
+          TICKERS: "NVDA,MSFT,AAPL"   # ←まずは確実な銘柄で切り分け
+          ALWAYS_SEND: "1"
+          SUCCESS_TEST: "0"
 
-          # 追加：ニュース（各社ニュース等）
-          USE_NEWS: "1"
-          NEWS_LOOKBACK_HOURS: "72"
-          NEWS_LIMIT: "20"
-          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
-
-        run: python alert_bot.py
+          USE_NEWS: "0"              # ←まずニュースOFFで切り分け
+        run: |
+          ls -la
+          python -u alert_bot.py
