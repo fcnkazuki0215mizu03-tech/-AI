@@ -141,12 +141,16 @@ def judge_signal(ticker: str) -> dict:
     BUY_RSI = 40
     SELL_RSI = 75
 
-    close = fetch_close(ticker, 120)
-    last = float(close.iloc[-1])
-    ma20 = float(close.rolling(20).mean().iloc[-1])
-    rsi14 = float(calc_rsi(close, 14))
+# --- 追加：トレンド/変化を見込む指標 ---
+    ma50 = float(close.rolling(50).mean().iloc[-1])
 
-    pct_vs_ma20 = (last / ma20 - 1.0) * 100.0
+    # 20日(約1か月)/60日(約3か月) 変化率
+    ret_20 = (last / float(close.iloc[-21]) - 1.0) * 100.0 if len(close) > 21 else 0.0
+    ret_60 = (last / float(close.iloc[-61]) - 1.0) * 100.0 if len(close) > 61 else 0.0
+
+    # 直近60日高値からの下落率（押し目の深さ）
+    high_60 = float(close.iloc[-60:].max()) if len(close) >= 60 else float(close.max())
+    drawdown_60 = (last / high_60 - 1.0) * 100.0  # マイナスなら高値から下落中
 
     # --- 判定 ---
     if rsi14 <= 30:
